@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Event Registration Portal</title>
+    <meta name="description" content="Lovable Generated Project" />
+    <meta name="author" content="Lovable" />
+    <meta property="og:title" content="Lovable App" />
+    <meta property="og:description" content="Lovable Generated Project" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@Lovable" />
+    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <style>
+      /* base styles only */
+      body { margin:0; font-family: Arial, sans-serif; background:#f5f7fb; }
+
+      /* Modal (compact) */
+      #admin-modal {
+        display: none;
+        position: fixed;
+        z-index: 10001;
+        left: 50%;
+        top: 12%;
+        transform: translateX(-50%);
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+        padding: 16px;
+        width: 320px;
+      }
+      #admin-modal h3 { margin:0 0 8px; font-size:16px; }
+      #admin-modal label { display:block; font-size:13px; margin-top:8px; }
+      #admin-modal input { width:100%; padding:8px; margin-top:6px; box-sizing:border-box; }
+      #admin-modal .actions { margin-top:12px; display:flex; gap:8px; }
+      #admin-modal button { flex:1; padding:8px; border:0; border-radius:6px; cursor:pointer; }
+      #admin-modal .cancel { background:#eee; color:#333; }
+      #admin-modal .submit { background:#0078d4; color:#fff; }
+
+      /* Admin dashboard panel (hidden by default) */
+      #admin-dashboard {
+        display: none;
+        position: fixed;
+        right: 12px;
+        top: 56px;
+        width: 380px;
+        max-height: 80vh;
+        overflow:auto;
+        z-index: 10000;
+        background:#fff;
+        border-radius:8px;
+        box-shadow:0 10px 30px rgba(0,0,0,0.12);
+        padding:16px;
+      }
+      /* Ensure visibility even if app CSS overrides styles */
+      #admin-dashboard.visible { display: block !important; z-index: 2147483647 !important; }
+      #admin-dashboard h4 { margin:0 0 8px; }
+      #admin-dashboard .logout { margin-top:12px; padding:8px; background:#e53935; color:#fff; border:0; border-radius:6px; cursor:pointer; width:100%; }
+    </style>
+  </head>
+
+  <body>
+    <!-- existing app root (hidden until login) -->
+    <div id="root"></div>
+
+    <!-- Compact admin login modal -->
+    <div id="admin-modal" role="dialog" aria-label="Admin login" aria-hidden="true">
+      <form id="admin-login" autocomplete="off">
+        <h3>Admin Sign in</h3>
+        <label>Username
+          <input id="admin-username" name="username" type="text" required />
+        </label>
+        <label>Password
+          <input id="admin-password" name="password" type="password" required />
+        </label>
+        <div class="actions">
+          <button type="button" class="cancel" id="admin-cancel">Cancel</button>
+          <button type="submit" class="submit">Sign in</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Admin dashboard (small panel) -->
+    <aside id="admin-dashboard" aria-label="Admin dashboard" aria-hidden="true">
+      <h4>Admin Dashboard</h4>
+      <div id="admin-content">
+        <!-- placeholder: keep admin controls minimal to avoid touching other code -->
+        <p>Welcome, admin.</p>
+      </div>
+      <button id="admin-logout" class="logout">Logout</button>
+    </aside>
+
+    <script>
+      (function(){
+        const modal = document.getElementById('admin-modal');
+        const form = document.getElementById('admin-login');
+        const cancel = document.getElementById('admin-cancel');
+        const dashboard = document.getElementById('admin-dashboard');
+        const logout = document.getElementById('admin-logout');
+
+        // Hardcoded credentials (change as needed)
+        const CRED = { user: 'admin', pass: 'admin123' };
+
+        function showModal(){
+          modal.style.display = 'block';
+          modal.setAttribute('aria-hidden','false');
+          document.getElementById('admin-username').focus();
+        }
+        function hideModal(){
+          modal.style.display = 'none';
+          modal.setAttribute('aria-hidden','true');
+        }
+
+        function showDashboard(){
+          dashboard.classList.add('visible');
+          dashboard.setAttribute('aria-hidden','false');
+          hideModal();
+          sessionStorage.setItem('isAdmin','true');
+        }
+        function hideDashboard(){
+          dashboard.classList.remove('visible');
+          dashboard.setAttribute('aria-hidden','true');
+          sessionStorage.removeItem('isAdmin');
+        }
+
+        function isAdminTrigger(el){
+          if(!el) return false;
+          if (el.matches('[data-admin-button], [aria-label*="admin" i], #admin-btn')) return true;
+          const txt = (el.textContent || '').trim().toLowerCase();
+          return txt === 'admin';
+        }
+
+        // Intercept pointerdown/touchstart in capture phase to prevent app from opening its admin dropdown
+        function interceptEvent(e){
+          try {
+            const btn = e.target.closest('button, a, [role="button"]');
+            if (!btn) return;
+            if (isAdminTrigger(btn) && sessionStorage.getItem('isAdmin') !== 'true') {
+              // prevent app UI from opening its dropdown
+              e.stopImmediatePropagation();
+              e.preventDefault();
+              // show our login modal instead
+              showModal();
+            }
+          } catch (err) { /* ignore */ }
+        }
+        document.addEventListener('pointerdown', interceptEvent, true);
+        document.addEventListener('touchstart', interceptEvent, true);
+
+        // Delegated click handler (for cases where pointerdown didn't fire)
+        document.addEventListener('click', function(e){
+          const btn = e.target.closest('button, a, [role="button"]');
+          if (!btn) return;
+          if (isAdminTrigger(btn)) {
+            // if already authenticated, allow app to proceed; otherwise we already intercepted pointerdown
+            if (sessionStorage.getItem('isAdmin') === 'true') {
+              // Let the app handle the click normally, but also show our admin panel
+              // Dispatch dashboard after a short delay so app's dropdown can render then we can proceed if needed.
+              setTimeout(() => showDashboard(), 150);
+            } else {
+              // In rare cases click fires without pointerdown interception — prevent it and show modal.
+              e.stopImmediatePropagation();
+              e.preventDefault();
+              showModal();
+            }
+          }
+        }, true);
+
+        cancel.addEventListener('click', function(e){ e.preventDefault(); hideModal(); });
+
+        form.addEventListener('submit', function(e){
+          e.preventDefault();
+          const u = document.getElementById('admin-username').value.trim();
+          const p = document.getElementById('admin-password').value;
+          if (u === CRED.user && p === CRED.pass) {
+            // mark authenticated
+            sessionStorage.setItem('isAdmin','true');
+            hideModal();
+
+            // find the app's Admin trigger and re-dispatch a click so app's dropdown/route opens
+            const appAdminBtn = document.querySelector('[data-admin-button], [aria-label*="admin" i], #admin-btn, button, a');
+            // try to find visible "Admin" text if obvious selectors fail
+            const visibleAdmin = appAdminBtn || Array.from(document.querySelectorAll('button, a'))
+              .filter(n => n.offsetParent !== null)
+              .find(n => (n.textContent || '').trim().toLowerCase() === 'admin');
+
+            const targetBtn = visibleAdmin || appAdminBtn;
+            if (targetBtn) {
+              // dispatch a synthetic click (bubbling) so app reacts
+              setTimeout(() => {
+                const ev = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+                targetBtn.dispatchEvent(ev);
+                // also show our admin panel (in case app doesn't)
+                showDashboard();
+              }, 50);
+            } else {
+              // no app button found — just show our dashboard
+              showDashboard();
+            }
+
+          } else {
+            alert('Invalid credentials.');
+          }
+        });
+
+        logout.addEventListener('click', function(){
+          hideDashboard();
+        });
+
+        // ensure we don't auto-open dashboard on load
+      })();
+    </script>
+
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
